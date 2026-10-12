@@ -1,0 +1,44 @@
+name: ActivityFarm
+
+on:
+  schedule:
+    # cron в GitHub работает по UTC; ЕКБ = UTC+5, значит 12:00–14:00 ЕКБ = 07:00–09:00 UTC
+    - cron: "5 7 * * *"   # 12:05 ЕКБ — слот 1
+    - cron: "30 7 * * *"  # 12:30 ЕКБ — слот 2
+    - cron: "55 7 * * *"  # 12:55 ЕКБ — слот 3
+    - cron: "20 8 * * *"  # 13:20 ЕКБ — слот 4
+    - cron: "45 8 * * *"  # 13:45 ЕКБ — слот 5
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Номер активности 1–5 (только для ручного запуска)"
+        default: "1"
+
+jobs:
+  activity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+      TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+      START_DATE: "2026-10-12"  # дата первого запуска = день 1, поменяй при необходимости
+      SCHEDULE: ${{ github.event.schedule }}
+      MANUAL_SLOT: ${{ github.event.inputs.slot }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Определить номер активности
+        run: |
+          case "$SCHEDULE" in
+            "5 7 * * *")  slot=1 ;;
+            "30 7 * * *") slot=2 ;;
+            "55 7 * * *") slot=3 ;;
+            "20 8 * * *") slot=4 ;;
+            "45 8 * * *") slot=5 ;;
+            *)            slot="$MANUAL_SLOT" ;;
+          esac
+          echo "SLOT=$slot" >> "$GITHUB_ENV"
+
+      - name: Выполнить активность и отправить уведомление
+        run: python3 scripts/activity_farm.py
